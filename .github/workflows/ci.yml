@@ -1,0 +1,97 @@
+name: AI Evaluation & Safety-First CI Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  audit-test-and-evaluate:
+    name: Advanced Testing, Security Audit & Safety Evaluation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Project Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Secret Leak & Credential Audit
+        run: |
+          python -c "
+          from prompt_evaluator.security import SecretScanner
+          res = SecretScanner.scan_directory('.')
+          print(res['status'])
+          if not res['is_clean']:
+              print('Detected secret leaks:', res['findings'])
+              exit(1)
+          "
+
+      - name: Run Unified Test Suite (Adversarial, Injections, Edge Cases, Regression, Consistency)
+        run: |
+          python run_all_tests.py
+
+      - name: Run Baseline Verification Suite
+        run: |
+          python run_tests.py
+
+      - name: Execute Full Evaluation Pipeline
+        run: |
+          python run_pipeline.py
+
+      - name: Validate Output Schemas & 300-Question Invariant
+        run: |
+          python -c "
+          import pandas as pd
+          # Validate verdicts.csv
+          v = pd.read_csv('outputs/verdicts.csv')
+          assert v.shape == (300, 2), f'Expected (300, 2), got {v.shape}'
+          assert list(v.columns) == ['id', 'better'], f'Invalid columns: {v.columns}'
+          assert set(v['better'].unique()).issubset({'current', 'new', 'tie'}), 'Invalid verdict values'
+          
+          # Validate scores.csv
+          s = pd.read_csv('outputs/scores.csv')
+          assert len(s) == 300, f'Expected 300 rows in scores, got {len(s)}'
+          
+          # Validate Safety-First decision
+          from prompt_evaluator.report_generator import compute_metrics
+          from prompt_evaluator.evaluator import AnswerEvaluator
+          evaluator = AnswerEvaluator()
+          df = pd.read_csv('questions.csv')
+          res = evaluator.evaluate_dataframe(df)
+          metrics = compute_metrics(res)
+          if metrics['critical_security_count'] > 0:
+              assert metrics['recommendation'] == 'DO NOT SHIP', 'Critical security risk MUST block SHIP!'
+          print('CI Validation: Output schema and Safety-First invariants verified 100%!')
+          "
+
+      - name: Verify Cryptographic SHA-256 Manifest
+        run: |
+          python -c "
+          from prompt_evaluator.security import ArtifactIntegrityManager
+          manifest = ArtifactIntegrityManager.generate_manifest({
+              'verdicts_csv': 'outputs/verdicts.csv',
+              'scores_csv': 'outputs/scores.csv',
+              'evaluation_report': 'outputs/evaluation_report.md'
+          }, 'outputs/integrity_manifest.json')
+          is_valid, errs = ArtifactIntegrityManager.verify_manifest('outputs/integrity_manifest.json')
+          assert is_valid, f'Integrity verification failed: {errs}'
+          print('SHA-256 Checksums verified successfully!')
+          "
+
+      - name: Upload Evaluated Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: evaluation-benchmark-artifacts
+          path: outputs/
+          retention-days: 30

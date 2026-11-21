@@ -14,9 +14,9 @@ def compute_metrics(results_df: pd.DataFrame, tie_threshold: float = 2.5) -> Dic
     Compute aggregate evaluation metrics across questions, topics, and criteria.
     """
     total_q = len(results_df)
-    curr_avg = float(results_df["curr_total_score"].mean())
-    new_avg = float(results_df["new_total_score"].mean())
-    score_diff_avg = float(results_df["score_diff"].mean())
+    curr_avg = float(results_df["curr_total_score"].mean()) if total_q > 0 else 0.0
+    new_avg = float(results_df["new_total_score"].mean()) if total_q > 0 else 0.0
+    score_diff_avg = float(results_df["score_diff"].mean()) if total_q > 0 else 0.0
 
     win_counts = results_df["better"].value_counts().to_dict()
     curr_wins = win_counts.get("current", 0)
@@ -400,4 +400,14 @@ def run_full_pipeline(
         "scores_csv": scores_path,
         "evaluation_report": report_path,
     }
+
+    try:
+        from prompt_evaluator.security import ArtifactIntegrityManager
+    except ImportError:
+        from security import ArtifactIntegrityManager
+
+    manifest_path = os.path.join(output_dir, "integrity_manifest.json")
+    ArtifactIntegrityManager.generate_manifest(paths, manifest_path)
+    paths["integrity_manifest"] = manifest_path
+
     return results_df, metrics, paths

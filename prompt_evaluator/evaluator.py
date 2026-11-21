@@ -366,6 +366,12 @@ class AnswerEvaluator:
         else:
             notes.append("Zero conversational fluff")
 
+        # Excessive verbosity penalty (> 120 words for support responses)
+        if total_words > 120:
+            excess_penalty = min(5.0, (total_words - 120) / 40.0)
+            score -= excess_penalty
+            notes.append(f"Excessive verbosity penalty (-{excess_penalty:.1f} pts for {total_words} words)")
+
         score = float(np.clip(score, 1.0, 10.0))
         return round(score, 1), "; ".join(notes)
 

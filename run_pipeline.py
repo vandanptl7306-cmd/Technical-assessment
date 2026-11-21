@@ -11,10 +11,11 @@ results_df, metrics, paths = run_full_pipeline(
 
 # Also copy outputs to root outputs/ directory
 os.makedirs("outputs", exist_ok=True)
-for fname in ["verdicts.csv", "scores.csv", "evaluation_report.md"]:
+for fname in ["verdicts.csv", "scores.csv", "evaluation_report.md", "integrity_manifest.json"]:
     src = os.path.join("prompt_evaluator/outputs", fname)
-    dst = os.path.join("outputs", fname)
-    shutil.copy2(src, dst)
+    if os.path.exists(src):
+        dst = os.path.join("outputs", fname)
+        shutil.copy2(src, dst)
 
 print("\nPipeline execution complete!")
 print("Artifacts generated:")

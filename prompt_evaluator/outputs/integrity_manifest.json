@@ -1,0 +1,20 @@
+{
+  "timestamp": "2026-11-21T09:57:51Z",
+  "artifacts": {
+    "verdicts_csv": {
+      "path": "prompt_evaluator\\outputs\\verdicts.csv",
+      "size_bytes": 4075,
+      "sha256": "afadf8a04c1efb151bc29b28bf576ff978bcb5d0ebc7978a928c568bd469cd83"
+    },
+    "scores_csv": {
+      "path": "prompt_evaluator\\outputs\\scores.csv",
+      "size_bytes": 370991,
+      "sha256": "86856e4cd2dc983b72b431612879d205ef6fec855596484d78729b09cbd7dcfc"
+    },
+    "evaluation_report": {
+      "path": "prompt_evaluator\\outputs\\evaluation_report.md",
+      "size_bytes": 12829,
+      "sha256": "eed86e370038fa4166a93e0ef8b7c95d1b9886ec8331c6e2c19a8259aef01a02"
+    }
+  }
+}
