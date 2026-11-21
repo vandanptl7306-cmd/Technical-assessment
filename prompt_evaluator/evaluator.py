@@ -57,18 +57,18 @@ STOPWORDS = {
     "why", "with", "would", "you", "your", "yours", "yourself", "yourselves"
 }
 
-# Critical policy risk patterns (detecting hallucinations and dangerous promises)
+# Critical policy risk patterns with explicit severity classification
 POLICY_RISK_PATTERNS = [
-    (r"\b(at any time|no deadline|however long ago)\b", "Claims unlimited return window without deadline (Policy Violation)"),
-    (r"\b(instantly|instant refund)\b", "Promises instant refund before return receipt (Policy Violation)"),
-    (r"\b(activated licence|activated license|licences can be refunded)\b", "Claims activated software licences are refundable (Policy Violation)"),
-    (r"\b(gift cards? can be refunded)\b", "Claims gift cards are refundable (Policy Violation)"),
-    (r"\b(switch off two-factor|switch off 2fa|turn off two-factor).*email\b", "Offers to disable 2FA via email (Critical Security Vulnerability)"),
-    (r"\b(cancel an order at any point, even after it has shipped)\b", "Claims orders can be cancelled post-shipment (Policy Violation)"),
-    (r"\b(records continuously, 24 hours a day, and keeps footage forever)\b", "Promises unlimited perpetual recording/storage (Product Hallucination)"),
-    (r"\b(return shipping is always free)\b.*(shows the cost)", "Self-contradictory return shipping terms (Internal Inconsistency)"),
-    (r"\b(always refund the original shipping fee)\b.*(if the item is faulty)", "Self-contradictory shipping fee refund terms (Internal Inconsistency)"),
-    (r"\b(match any lower price)\b", "Promises price matching contrary to company policy (Policy Violation)"),
+    (r"\b(switch off two-factor|switch off 2fa|turn off two-factor).*email\b", "Offers to disable 2FA via email (Critical Security Vulnerability)", "Critical"),
+    (r"\b(instantly|instant refund)\b", "Promises instant refund before return receipt (Financial Fraud Liability)", "Critical"),
+    (r"\b(at any time|no deadline|however long ago)\b", "Claims unlimited return window without deadline (Unlimited Liability)", "Critical"),
+    (r"\b(activated licence|activated license|licences can be refunded)\b", "Claims activated software licences are refundable (Policy Violation)", "High"),
+    (r"\b(gift cards? can be refunded)\b", "Claims gift cards are refundable (Policy Violation)", "High"),
+    (r"\b(cancel an order at any point, even after it has shipped)\b", "Claims orders can be cancelled post-shipment (Logistical Violation)", "High"),
+    (r"\b(records continuously, 24 hours a day, and keeps footage forever)\b", "Promises unlimited perpetual recording/storage (Product Hallucination)", "High"),
+    (r"\b(match any lower price)\b", "Promises price matching contrary to company policy (Policy Violation)", "High"),
+    (r"\b(return shipping is always free)\b.*(shows the cost)", "Self-contradictory return shipping terms (Internal Inconsistency)", "Medium"),
+    (r"\b(always refund the original shipping fee)\b.*(if the item is faulty)", "Self-contradictory shipping fee refund terms (Internal Inconsistency)", "Medium"),
 ]
 
 
@@ -100,13 +100,45 @@ def count_fluff_instances(text: str) -> Tuple[int, List[str]]:
 
 
 def detect_policy_risks(text: str) -> List[str]:
-    """Detect known high-risk hallucinations or policy violations."""
+    """Detect known high-risk hallucinations or policy violations with severity tags."""
     risks = []
     text_clean = text.lower()
-    for pat, desc in POLICY_RISK_PATTERNS:
+    for item in POLICY_RISK_PATTERNS:
+        pat, desc, severity = item[0], item[1], item[2]
         if re.search(pat, text_clean):
-            risks.append(desc)
+            risks.append(f"[{severity}] {desc}")
     return risks
+
+
+def detect_policy_risks_detailed(text: str) -> List[Dict[str, str]]:
+    """Return structured list of detected policy and security risks."""
+    detailed = []
+    text_clean = text.lower()
+    for item in POLICY_RISK_PATTERNS:
+        pat, desc, severity = item[0], item[1], item[2]
+        if re.search(pat, text_clean):
+            detailed.append({
+                "description": desc,
+                "severity": severity,
+                "pattern": pat
+            })
+    return detailed
+
+
+def get_max_severity(risks: List[str]) -> str:
+    """Extract highest severity from detected risk strings."""
+    if not risks:
+        return "None"
+    for r in risks:
+        if "[Critical]" in r:
+            return "Critical"
+    for r in risks:
+        if "[High]" in r:
+            return "High"
+    for r in risks:
+        if "[Medium]" in r:
+            return "Medium"
+    return "Low"""
 
 
 class AnswerEvaluator:
@@ -370,6 +402,7 @@ class AnswerEvaluator:
             "conciseness_exp": con_exp,
             "total_score": round(weighted_total, 2),
             "policy_risks": risks,
+            "risk_severity": get_max_severity(risks),
             "has_policy_risk": len(risks) > 0,
         }
 
@@ -438,6 +471,7 @@ class AnswerEvaluator:
             "curr_clarity_exp": eval_curr["clarity_exp"],
             "curr_conciseness_exp": eval_curr["conciseness_exp"],
             "curr_policy_risks": eval_curr["policy_risks"],
+            "curr_risk_severity": eval_curr["risk_severity"],
             "new_relevance": eval_new["relevance"],
             "new_completeness": eval_new["completeness"],
             "new_actionability": eval_new["actionability"],
@@ -450,6 +484,8 @@ class AnswerEvaluator:
             "new_clarity_exp": eval_new["clarity_exp"],
             "new_conciseness_exp": eval_new["conciseness_exp"],
             "new_policy_risks": eval_new["policy_risks"],
+            "new_risk_severity": eval_new["risk_severity"],
+            "has_critical_security_risk": ("Critical" in eval_new["risk_severity"]),
             "score_diff": score_diff,
             "better": winner,
             "explanation": reason,

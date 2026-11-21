@@ -1,10 +1,12 @@
 """
 Streamlit Web Application: Is the New Prompt Better?
-Professional AI/ML Assistant Evaluation Dashboard.
+Professional AI/ML Assistant Evaluation Dashboard with Safety-First Decisions & Human Review.
 """
 
 import os
+import sys
 import io
+import datetime
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -78,26 +80,69 @@ st.markdown(
         font-weight: 600;
         font-size: 0.82rem;
     }
+    .badge-critical {
+        background-color: #fee2e2;
+        color: #991b1b;
+        border: 1px solid #f87171;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-weight: 700;
+        font-size: 0.82rem;
+    }
+    .badge-high {
+        background-color: #ffedd5;
+        color: #c2410c;
+        border: 1px solid #fb923c;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-weight: 700;
+        font-size: 0.82rem;
+    }
+    .badge-medium {
+        background-color: #fef9c3;
+        color: #854d0e;
+        border: 1px solid #facc15;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-weight: 700;
+        font-size: 0.82rem;
+    }
     .banner-danger {
         background-color: #fef2f2;
         border-left: 5px solid #ef4444;
         border-radius: 8px;
         padding: 16px 20px;
-        margin-bottom: 24px;
+        margin-bottom: 20px;
     }
     .banner-warning {
         background-color: #fffbeb;
         border-left: 5px solid #f59e0b;
         border-radius: 8px;
         padding: 16px 20px;
-        margin-bottom: 24px;
+        margin-bottom: 20px;
     }
     .banner-success {
         background-color: #f0fdf4;
         border-left: 5px solid #22c55e;
         border-radius: 8px;
         padding: 16px 20px;
-        margin-bottom: 24px;
+        margin-bottom: 20px;
+    }
+    .banner-transparency {
+        background-color: #f8fafc;
+        border-left: 5px solid #0284c7;
+        border-radius: 8px;
+        padding: 16px 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .review-card {
+        background-color: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 18px 20px;
+        margin-bottom: 18px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     }
     </style>
     """,
@@ -105,7 +150,6 @@ st.markdown(
 )
 
 # Imports from modular engine
-import sys
 _current_dir = os.path.dirname(os.path.abspath(__file__))
 _parent_dir = os.path.dirname(_current_dir)
 if _current_dir not in sys.path:
@@ -151,6 +195,10 @@ def run_evaluation(df_data: pd.DataFrame, tie_threshold: float):
     return results_df, metrics
 
 
+# Initialize Session State for Human Reviews
+if "human_reviews" not in st.session_state:
+    st.session_state["human_reviews"] = {}
+
 # -------------------------------------------------------------
 # Sidebar Configuration & Navigation
 # -------------------------------------------------------------
@@ -162,6 +210,7 @@ nav_choice = st.sidebar.radio(
     "Navigation",
     [
         "📊 Dashboard",
+        "🛡️ Human Review (Safety)",
         "📈 Analytics & Charts",
         "🔍 Individual Evaluation",
         "📋 Full Question Explorer",
@@ -180,8 +229,8 @@ tie_threshold = st.sidebar.slider(
     value=DEFAULT_TIE_THRESHOLD,
     step=0.5,
     help=(
-        "If the absolute difference between New and Current total score is within "
-        "this threshold, the verdict is recorded as a 'tie' to prevent noise-driven bias."
+        "Documented Tie Threshold: If absolute score difference |New - Current| is within "
+        "this threshold (±2.5 pts), the verdict is recorded as a 'tie' to avoid noise-driven bias."
     ),
 )
 
@@ -219,13 +268,25 @@ else:
 # Run Evaluation
 results_df, metrics = run_evaluation(active_df, tie_threshold)
 
+# Pre-populate human reviews for flagged questions if not present
+for _, r in results_df.iterrows():
+    qid = str(r["id"])
+    has_risk = bool(r["new_policy_risks"] and len(r["new_policy_risks"]) > 0)
+    if has_risk and qid not in st.session_state["human_reviews"]:
+        st.session_state["human_reviews"][qid] = {
+            "status": "Pending",
+            "notes": "",
+            "reviewed_at": None,
+        }
+
 st.sidebar.markdown("---")
 st.sidebar.markdown(
     f"""
     **Active Dataset:** `{st.session_state['dataset_name']}`  
     **Evaluated Rows:** `{len(results_df)}`  
-    **Scoring Engine:** `Lightweight NLP (TF-IDF + Heuristics)`  
-    **API Dependency:** `None (100% Local)`
+    **Policy Risks Flagged:** `{metrics['risk_count']}`  
+    **Critical Security Risks:** `{metrics.get('critical_security_count', 0)}`  
+    **Safety Principle:** `Safety-First Governance`
     """
 )
 
@@ -237,10 +298,10 @@ if nav_choice == "📊 Dashboard":
     st.title("⚖️ AI Assistant Prompt Evaluation Dashboard")
     st.markdown(
         "A rigorous, explainable evaluation comparing the **Live Assistant Prompt** against the **Proposed New Prompt** "
-        "across 300 customer support questions."
+        "across 300 customer support questions under **Safety-First Governance**."
     )
 
-    # Final Recommendation Banner
+    # Final Recommendation Banner with Safety-First Enforcement
     rec = metrics["recommendation"]
     if rec == "DO NOT SHIP":
         st.markdown(
@@ -248,11 +309,11 @@ if nav_choice == "📊 Dashboard":
             <div class="banner-danger">
                 <h3 style="color: #991b1b; margin-top:0;">🛑 FINAL RECOMMENDATION: DO NOT SHIP (IN CURRENT FORM)</h3>
                 <p style="color: #7f1d1d; font-size: 1.05rem; margin-bottom: 8px;">
-                    <b>Core Finding:</b> {metrics['recommendation_summary']}
+                    <b>Safety-First Finding:</b> {metrics['recommendation_summary']}
                 </p>
                 <p style="color: #991b1b; font-size: 0.95rem; margin-bottom: 0;">
-                    <b>Required Action:</b> Remediate 30 critical policy hallucinations in <code>refunds</code>, eliminate 2FA bypass risk in <code>account</code>, 
-                    and suppress boilerplate conversational filler before approving deployment.
+                    <b>Safety Directive:</b> High average scores or actionability improvements <u>cannot override</u> 
+                    critical security vulnerabilities (such as 2FA bypass in Q-081) or policy hallucinations in <code>refunds</code>.
                 </p>
             </div>
             """,
@@ -264,10 +325,10 @@ if nav_choice == "📊 Dashboard":
             <div class="banner-warning">
                 <h3 style="color: #92400e; margin-top:0;">⚠️ FINAL RECOMMENDATION: SHIP WITH CONDITIONS</h3>
                 <p style="color: #78350f; font-size: 1.05rem; margin-bottom: 8px;">
-                    <b>Core Finding:</b> {metrics['recommendation_summary']}
+                    <b>Safety-First Finding:</b> {metrics['recommendation_summary']}
                 </p>
                 <p style="color: #92400e; font-size: 0.95rem; margin-bottom: 0;">
-                    <b>Required Conditions:</b> Patch identified policy hallucinations and remove introductory fluff tokens.
+                    <b>Required Conditions:</b> Review flagged items in the Human Review module and add negative constraints to prompt.
                 </p>
             </div>
             """,
@@ -285,6 +346,27 @@ if nav_choice == "📊 Dashboard":
             """,
             unsafe_allow_html=True,
         )
+
+    # Evaluation Transparency & Scoring Methodology Banner
+    st.markdown(
+        """
+        <div class="banner-transparency">
+            <h4 style="color: #0369a1; margin-top: 0; margin-bottom: 8px;">🔬 Evaluation Transparency & Methodological Disclosure</h4>
+            <div style="font-size: 0.92rem; color: #334155; line-height: 1.5;">
+                <p style="margin-bottom: 6px;">
+                    • <b>Heuristic Scores are Estimates:</b> Automated scores are rule-based and NLP approximations (TF-IDF cosine similarity, keyword coverage, and syntactic density) designed for objective regression testing, not absolute ground truth.
+                </p>
+                <p style="margin-bottom: 6px;">
+                    • <b>Policy Flags Require Human Verification:</b> Automated policy and security risk flags are screening alerts indicating potential hallucinations or security bypasses. Domain experts must verify each flag in the <b>Human Review</b> section before production action.
+                </p>
+                <p style="margin-bottom: 0;">
+                    • <b>Scoring Methodology & Weights:</b> Total Score (0–100) = 2.5×Relevance (25%) + 2.5×Completeness (25%) + 2.0×Actionability (20%) + 1.5×Clarity (15%) + 1.5×Conciseness (15%). Documented Tie Threshold: <b>±2.5 pts</b>.
+                </p>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     # KPI Summary Cards
     col1, col2, col3, col4, col5, col6 = st.columns(6)
@@ -458,7 +540,206 @@ if nav_choice == "📊 Dashboard":
 
 
 # -------------------------------------------------------------
-# Section B: Analytics & Charts
+# Section B: Human Review (Safety & Policy Audit)
+# -------------------------------------------------------------
+elif nav_choice == "🛡️ Human Review (Safety)":
+    st.title("🛡️ Human Review: Safety & Policy Risk Audit")
+    st.markdown(
+        "Human-in-the-loop audit interface for flagged policy violations and security risks. "
+        "Reviewers verify automated detections and record audit statuses. "
+        "*(Note: The original automated verdicts in `verdicts.csv` remain strictly unchanged for governance auditability).*"
+    )
+
+    # Filter flagged questions
+    flagged_df = results_df[results_df["new_policy_risks"].apply(lambda r: len(r) > 0)].copy()
+
+    # Calculate review counts
+    confirmed_count = sum(1 for qid in flagged_df["id"] if st.session_state["human_reviews"].get(str(qid), {}).get("status") == "Confirmed")
+    fp_count = sum(1 for qid in flagged_df["id"] if st.session_state["human_reviews"].get(str(qid), {}).get("status") == "False Positive")
+    pending_count = len(flagged_df) - confirmed_count - fp_count
+    critical_count = sum(1 for _, row in flagged_df.iterrows() if any("[Critical]" in x for x in row["new_policy_risks"]))
+
+    # Summary KPI Cards
+    k1, k2, k3, k4 = st.columns(4)
+    with k1:
+        st.markdown(
+            f"""
+            <div class="metric-card">
+                <div class="metric-title">Flagged Questions</div>
+                <div class="metric-value">{len(flagged_df)}</div>
+                <div class="metric-sub">{critical_count} Critical Severity</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with k2:
+        st.markdown(
+            f"""
+            <div class="metric-card">
+                <div class="metric-title">Pending Review</div>
+                <div class="metric-value" style="color: #d97706;">{pending_count}</div>
+                <div class="metric-sub">Awaiting verification</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with k3:
+        st.markdown(
+            f"""
+            <div class="metric-card">
+                <div class="metric-title">Confirmed Risks</div>
+                <div class="metric-value" style="color: #dc2626;">{confirmed_count}</div>
+                <div class="metric-sub">Action required</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with k4:
+        st.markdown(
+            f"""
+            <div class="metric-card">
+                <div class="metric-title">False Positives</div>
+                <div class="metric-value" style="color: #16a34a;">{fp_count}</div>
+                <div class="metric-sub">Cleared findings</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    st.markdown("---")
+
+    # Review Filters
+    rf1, rf2, rf3 = st.columns(3)
+    with rf1:
+        status_filter = st.selectbox("Filter by Review Status", ["All", "Pending", "Confirmed", "False Positive"])
+    with rf2:
+        severity_filter = st.selectbox("Filter by Severity", ["All", "Critical", "High", "Medium"])
+    with rf3:
+        topic_rf = st.selectbox("Filter by Topic", ["All"] + sorted(list(flagged_df["topic"].unique())))
+
+    # Apply filters
+    display_flagged = flagged_df.copy()
+    if topic_rf != "All":
+        display_flagged = display_flagged[display_flagged["topic"] == topic_rf]
+    if severity_filter != "All":
+        display_flagged = display_flagged[
+            display_flagged["new_policy_risks"].apply(lambda risks: any(f"[{severity_filter}]" in r for r in risks))
+        ]
+    if status_filter != "All":
+        display_flagged = display_flagged[
+            display_flagged["id"].apply(lambda qid: st.session_state["human_reviews"].get(str(qid), {}).get("status") == status_filter)
+        ]
+
+    st.write(f"Showing **{len(display_flagged)}** flagged question(s) matching filter:")
+
+    # Render review cards
+    for idx, row in display_flagged.iterrows():
+        qid = str(row["id"])
+        review_data = st.session_state["human_reviews"].get(qid, {"status": "Pending", "notes": ""})
+
+        # Determine severity badge
+        has_crit = any("[Critical]" in x for x in row["new_policy_risks"])
+        has_high = any("[High]" in x for x in row["new_policy_risks"])
+        sev_label = "CRITICAL" if has_crit else ("HIGH" if has_high else "MEDIUM")
+        sev_class = "badge-critical" if has_crit else ("badge-high" if has_high else "badge-medium")
+
+        automated_verdict = row["better"].upper()
+        verdict_badge_class = "badge-win-new" if row["better"] == "new" else ("badge-win-curr" if row["better"] == "current" else "badge-tie")
+
+        with st.container():
+            st.markdown(
+                f"""
+                <div class="review-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="font-weight: 700; font-size: 1.15rem; color: #0f172a;">
+                            {row['id']} — Topic: <code>{row['topic']}</code>
+                        </span>
+                        <div>
+                            <span class="{sev_class}">SEVERITY: {sev_label}</span>
+                            <span class="{verdict_badge_class}" style="margin-left: 8px;">Automated Verdict: {automated_verdict} (Unchanged)</span>
+                        </div>
+                    </div>
+                    <div style="font-size: 1.0rem; color: #1e293b; margin-bottom: 8px;">
+                        <b>Customer Question:</b> {row['question']}
+                    </div>
+                    <div style="background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 10px 14px; margin-bottom: 12px;">
+                        <b style="color: #991b1b;">⚠️ Detected Risk(s):</b>
+                        <ul style="margin: 4px 0 0 0; padding-left: 20px; color: #7f1d1d;">
+                            {"".join(f"<li>{r}</li>" for r in row['new_policy_risks'])}
+                        </ul>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            c_ans1, c_ans2 = st.columns(2)
+            with c_ans1:
+                st.caption(f"Current Answer (Score: {row['curr_total_score']:.1f})")
+                st.info(row["answer_current"])
+            with c_ans2:
+                st.caption(f"New Answer (Score: {row['new_total_score']:.1f})")
+                st.warning(row["answer_new"])
+
+            # Reviewer controls
+            r_col1, r_col2 = st.columns([1, 2])
+            with r_col1:
+                new_status = st.radio(
+                    f"Review Status for {qid}",
+                    ["Pending", "Confirmed", "False Positive"],
+                    index=["Pending", "Confirmed", "False Positive"].index(review_data["status"]),
+                    key=f"status_select_{qid}",
+                    horizontal=True,
+                )
+            with r_col2:
+                new_notes = st.text_input(
+                    f"Reviewer Notes for {qid}",
+                    value=review_data.get("notes", ""),
+                    placeholder="e.g., Confirmed 2FA vulnerability; model must require backup code.",
+                    key=f"notes_input_{qid}",
+                )
+
+            # Update session state
+            if new_status != review_data["status"] or new_notes != review_data.get("notes", ""):
+                st.session_state["human_reviews"][qid] = {
+                    "status": new_status,
+                    "notes": new_notes,
+                    "reviewed_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                }
+
+            st.markdown("---")
+
+    # Audit Log Export
+    st.subheader("📥 Export Human Review Audit Log")
+    log_rows = []
+    for idx, row in flagged_df.iterrows():
+        qid = str(row["id"])
+        r_meta = st.session_state["human_reviews"].get(qid, {"status": "Pending", "notes": "", "reviewed_at": None})
+        has_crit = any("[Critical]" in x for x in row["new_policy_risks"])
+        sev = "Critical" if has_crit else "High"
+        log_rows.append(
+            {
+                "id": qid,
+                "topic": row["topic"],
+                "severity": sev,
+                "detected_risks": "; ".join(row["new_policy_risks"]),
+                "automated_verdict": row["better"],
+                "human_review_status": r_meta["status"],
+                "reviewer_notes": r_meta["notes"],
+                "reviewed_at": r_meta.get("reviewed_at", "N/A"),
+            }
+        )
+    log_df = pd.DataFrame(log_rows)
+    st.download_button(
+        label="⬇️ Download Human Review Audit Log (CSV)",
+        data=log_df.to_csv(index=False),
+        file_name="human_review_audit_log.csv",
+        mime="text/csv",
+    )
+
+
+# -------------------------------------------------------------
+# Section C: Analytics & Charts
 # -------------------------------------------------------------
 elif nav_choice == "📈 Analytics & Charts":
     st.title("📈 Performance Analytics & Deep Dive")
@@ -568,7 +849,7 @@ elif nav_choice == "📈 Analytics & Charts":
 
 
 # -------------------------------------------------------------
-# Section C: Individual Question Evaluation
+# Section D: Individual Question Evaluation
 # -------------------------------------------------------------
 elif nav_choice == "🔍 Individual Evaluation":
     st.title("🔍 Individual Question Inspector")
@@ -624,7 +905,9 @@ elif nav_choice == "🔍 Individual Evaluation":
 
     # Policy Risk Warning if applicable
     if q_data["new_policy_risks"]:
-        st.error(f"🚨 **Policy Risk in New Version:** {'; '.join(q_data['new_policy_risks'])}")
+        has_crit = any("[Critical]" in x for x in q_data["new_policy_risks"])
+        alert_title = "CRITICAL SECURITY/POLICY RISK" if has_crit else "POLICY VIOLATION ALERT"
+        st.error(f"🚨 **{alert_title} in New Version:** {'; '.join(q_data['new_policy_risks'])}")
 
     # Side-by-side Answer Comparison
     ans_col1, ans_col2 = st.columns(2)
@@ -698,7 +981,7 @@ elif nav_choice == "🔍 Individual Evaluation":
 
 
 # -------------------------------------------------------------
-# Section D: Full Question Explorer
+# Section E: Full Question Explorer
 # -------------------------------------------------------------
 elif nav_choice == "📋 Full Question Explorer":
     st.title("📋 Full Question Explorer & Table")
@@ -743,7 +1026,7 @@ elif nav_choice == "📋 Full Question Explorer":
 
 
 # -------------------------------------------------------------
-# Section E: Dataset Management
+# Section F: Dataset Management
 # -------------------------------------------------------------
 elif nav_choice == "📁 Dataset Management":
     st.title("📁 Dataset Management & Schema Validator")
@@ -774,7 +1057,7 @@ elif nav_choice == "📁 Dataset Management":
 
 
 # -------------------------------------------------------------
-# Section F: Report & Exports
+# Section G: Report & Exports
 # -------------------------------------------------------------
 elif nav_choice == "📑 Report & Exports":
     st.title("📑 Export Artifacts & Full Report")
