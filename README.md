@@ -125,6 +125,22 @@ This generates:
 - `outputs/verdicts.csv` (and `prompt_evaluator/outputs/verdicts.csv`)
 - `outputs/scores.csv`
 - `outputs/evaluation_report.md`
+- `outputs/integrity_manifest.json`
+
+### Option C: Run the Complete Automated Test Suite (27 Tests)
+To execute all 27 unit, regression, adversarial, and security tests:
+```bash
+python run_all_tests.py
+```
+Or run individual suites:
+```bash
+python -m unittest tests/test_adversarial.py
+python -m unittest tests/test_prompt_injection.py
+python -m unittest tests/test_edge_cases.py
+python -m unittest tests/test_regression.py
+python -m unittest tests/test_consistency.py
+python -m unittest tests/test_security.py
+```
 
 ---
 
@@ -251,9 +267,23 @@ To transform this benchmark into an automated quality gate for every future chan
 ```
 Technical-assessment/
 │
+├── .github/
+│   └── workflows/
+│       └── ci.yml                 # Automated CI/CD pipeline (tests, secret scan, SHA-256)
+│
+├── tests/                         # Production Test Suite (27 tests, 100% passing)
+│   ├── test_adversarial.py        # Malicious inputs, bypasses, safety blocks
+│   ├── test_prompt_injection.py   # Direct/indirect prompt injection defenses
+│   ├── test_edge_cases.py         # 6000-word stress, nulls, duplicates, empty datasets
+│   ├── test_regression.py         # Golden regression suite (Q-013, Q-081, distributions)
+│   ├── test_consistency.py        # 5-run determinism (0.000 var), boundary tests
+│   └── test_security.py           # Static secret scanner & SHA-256 tamper checks
+│
 ├── prompt_evaluator/
-│   ├── app.py                     # Streamlit SaaS web application
-│   ├── evaluator.py               # 5-criterion explainable NLP scoring engine
+│   ├── app.py                     # Streamlit SaaS web app (9 interactive sections)
+│   ├── evaluator.py               # 5-criterion NLP scoring engine
+│   ├── quality_engine.py          # Hallucination detector, decoupled confidence, 5x5 RPN
+│   ├── security.py                # SecretScanner, ArtifactIntegrityManager, Profiler
 │   ├── data_loader.py             # CSV ingestion & schema validation
 │   ├── report_generator.py        # Metrics, report, and CSV artifact generator
 │   ├── requirements.txt           # Project dependencies
@@ -263,17 +293,24 @@ Technical-assessment/
 │   └── outputs/
 │       ├── verdicts.csv           # id,better (exactly 300 rows)
 │       ├── scores.csv             # Detailed scoring table across all criteria
-│       └── evaluation_report.md   # Executive evaluation report
+│       ├── evaluation_report.md   # Executive evaluation report
+│       └── integrity_manifest.json# SHA-256 tamper-proof file manifest
 │
 ├── outputs/                       # Root-accessible copies of output artifacts
 │   ├── verdicts.csv
 │   ├── scores.csv
-│   └── evaluation_report.md
+│   ├── evaluation_report.md
+│   └── integrity_manifest.json
 │
 ├── app.py                         # Root launcher for Streamlit
+├── evaluator.py                   # Root scoring engine
+├── quality_engine.py              # Root quality engine
+├── security.py                    # Root security & integrity module
 ├── requirements.txt               # Root dependencies
 ├── README.md                      # Root documentation
-└── run_pipeline.py                # Command-line pipeline execution script
+├── run_pipeline.py                # Command-line pipeline execution script
+├── run_all_tests.py               # Master test runner (27 tests)
+└── run_tests.py                   # Baseline regression test runner
 ```
 
 ---
@@ -286,5 +323,10 @@ Technical-assessment/
 - [x] `verdicts.csv` generated with exactly two columns (`id,better`) and 300 rows.
 - [x] `scores.csv` generated with complete multi-criteria breakdown.
 - [x] `evaluation_report.md` generated with executive summary, methodology, topic analysis, and recommendations.
-- [x] Streamlit web application running with KPI cards, Plotly charts, filters, and individual question inspector.
-- [x] CI/CD design note documented with 6 actionable automation steps.
+- [x] Streamlit web application running with 9 modules, KPI cards, Plotly charts, filters, and individual question inspector.
+- [x] Safety-First Decision Governance implemented: Critical security violations unconditionally block SHIP.
+- [x] Human Review queue implemented with reviewer identity, decision states (Pending, Confirmed, False Positive), and audit log.
+- [x] Advanced Quality Engine implemented: Hallucination detection, decoupled confidence scoring, 5x5 Risk Priority Matrix (RPN), and statistical calibration (ECE, percentiles).
+- [x] Security & Integrity module implemented: Zero-leak SecretScanner and SHA-256 cryptographic manifest verification.
+- [x] Advanced Testing Suite completed and verified: 27/27 tests passing across Adversarial, Prompt Injection, Edge Cases, Golden Regression (Q-013, Q-081), Consistency (0.000 variance), and Security.
+- [x] GitHub Actions CI/CD pipeline active in `.github/workflows/ci.yml`.
