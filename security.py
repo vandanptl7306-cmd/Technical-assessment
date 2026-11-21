@@ -7,7 +7,7 @@ Provides:
 4. Performance & Execution Latency Profiler.
 """
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 import os
 import re
 import time
